@@ -363,11 +363,7 @@ func (c *Cache) DeleteByPrefix(ctx context.Context, prefix string, maxIterations
 		if len(keys) > 0 {
 			for _, key := range keys {
 				c.sf.Forget(key)
-				if v, ok := c.versionMap.Load(key); ok {
-					if uv, ok := v.(*atomic.Uint64); ok {
-						uv.Add(1)
-					}
-				}
+				cacheKeyVersion(c, key).Add(1)
 			}
 			if err := c.redis.Unlink(ctx, keys...).Err(); err != nil {
 				return fmt.Errorf("cache delete by prefix unlink: %w", err)

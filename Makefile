@@ -1,4 +1,4 @@
-.PHONY: test test-race test-bench fmt vet mockery cover tidy
+.PHONY: test test-race test-bench test-integration fmt vet mockery cover tidy
 
 test:
 	go test ./...
@@ -8,6 +8,9 @@ test-race:
 
 test-bench:
 	go test -bench=. ./...
+
+test-integration:
+	go test -race -tags=integration -count=1 ./...
 
 fmt:
 	gofmt -w .

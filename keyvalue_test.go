@@ -2,6 +2,7 @@ package cachekit
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -64,4 +65,73 @@ func TestRedisKeyValueStore_SetGet_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, payload, got)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRedisKeyValueStore_Get_EmptyKey(t *testing.T) {
+	t.Parallel()
+	client, _ := redismock.NewClientMock()
+	store := &RedisKeyValueStore{Client: client}
+	_, err := store.Get(context.Background(), "")
+	require.ErrorIs(t, err, ErrEmptyKey)
+}
+
+func TestRedisKeyValueStore_Set_EmptyKey(t *testing.T) {
+	t.Parallel()
+	client, _ := redismock.NewClientMock()
+	store := &RedisKeyValueStore{Client: client}
+	err := store.Set(context.Background(), "", []byte("v"), time.Minute)
+	require.ErrorIs(t, err, ErrEmptyKey)
+}
+
+func TestRedisKeyValueStore_Set_InvalidTTL(t *testing.T) {
+	t.Parallel()
+	client, _ := redismock.NewClientMock()
+	store := &RedisKeyValueStore{Client: client}
+	err := store.Set(context.Background(), "k", []byte("v"), 0)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidTTL)
+}
+
+func TestRedisKeyValueStore_Del_NoKeys(t *testing.T) {
+	t.Parallel()
+	client, _ := redismock.NewClientMock()
+	store := &RedisKeyValueStore{Client: client}
+	require.NoError(t, store.Del(context.Background()))
+}
+
+func TestRedisKeyValueStore_Del_EmptyKeyString(t *testing.T) {
+	t.Parallel()
+	client, _ := redismock.NewClientMock()
+	store := &RedisKeyValueStore{Client: client}
+	require.ErrorIs(t, store.Del(context.Background(), ""), ErrEmptyKey)
+}
+
+func TestRedisKeyValueStore_Get_RedisError(t *testing.T) {
+	t.Parallel()
+	client, mock := redismock.NewClientMock()
+	mock.ExpectGet("k").SetErr(errors.New("redis down"))
+	store := &RedisKeyValueStore{Client: client}
+	_, err := store.Get(context.Background(), "k")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keyvalue get")
+}
+
+func TestRedisKeyValueStore_Set_RedisError(t *testing.T) {
+	t.Parallel()
+	client, mock := redismock.NewClientMock()
+	mock.ExpectSet("k", []byte("v"), time.Minute).SetErr(errors.New("redis down"))
+	store := &RedisKeyValueStore{Client: client}
+	err := store.Set(context.Background(), "k", []byte("v"), time.Minute)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keyvalue set")
+}
+
+func TestRedisKeyValueStore_Del_RedisError(t *testing.T) {
+	t.Parallel()
+	client, mock := redismock.NewClientMock()
+	mock.ExpectDel("k").SetErr(errors.New("redis down"))
+	store := &RedisKeyValueStore{Client: client}
+	err := store.Del(context.Background(), "k")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keyvalue del")
 }
