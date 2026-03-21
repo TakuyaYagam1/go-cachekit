@@ -78,6 +78,20 @@ func TestCachedValue_GetStale(t *testing.T) {
 	assert.Equal(t, 7, val)
 }
 
+func TestCachedValue_GetStale_SurvivesTTLExpiry(t *testing.T) {
+	t.Parallel()
+	v := NewCachedValue[int](context.Background(), "k", 50*time.Millisecond)
+	t.Cleanup(v.Stop)
+	ctx := context.Background()
+	_, err := v.Get(ctx, func(context.Context) (int, error) { return 99, nil })
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond)
+	assert.Nil(t, v.c.Get(v.key))
+	val, ok := v.GetStale()
+	require.True(t, ok)
+	assert.Equal(t, 99, val)
+}
+
 func TestCachedValue_Get_LoadError(t *testing.T) {
 	t.Parallel()
 	v := NewCachedValue[int](context.Background(), "k", time.Minute)

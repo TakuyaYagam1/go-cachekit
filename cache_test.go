@@ -222,7 +222,7 @@ func TestNew_WithMaxVersionMapEntries(t *testing.T) {
 
 func TestGetOrLoad_NilCache(t *testing.T) {
 	t.Parallel()
-	_, err := GetOrLoad[int](nil, context.Background(), "k", time.Minute, func(context.Context) (int, error) { return 0, nil })
+	_, err := GetOrLoad(nil, context.Background(), "k", time.Minute, func(context.Context) (int, error) { return 0, nil })
 	require.ErrorIs(t, err, ErrRedisNotConfigured)
 }
 

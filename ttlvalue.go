@@ -13,6 +13,10 @@ import (
 
 const defaultLoadTimeout = 30 * time.Second
 
+type staleEntry[T any] struct {
+	val T
+}
+
 // cachedValueConfig is the configuration for a CachedValue.
 type cachedValueConfig struct {
 	loadTimeout time.Duration
@@ -36,6 +40,7 @@ type CachedValue[T any] struct {
 	done        chan struct{}
 	once        sync.Once
 	version     atomic.Uint64
+	lastGood    atomic.Pointer[staleEntry[T]]
 	mu          sync.Mutex
 }
 
@@ -69,6 +74,7 @@ func NewCachedValueE[T any](ctx context.Context, key string, ttl time.Duration, 
 	c := ttlcache.New(
 		ttlcache.WithTTL[string, T](ttl),
 		ttlcache.WithCapacity[string, T](1),
+		ttlcache.WithDisableTouchOnHit[string, T](),
 	)
 	v := &CachedValue[T]{c: c, key: key, ttl: ttl, loadTimeout: loadTimeout, done: make(chan struct{})}
 	go func() {
@@ -105,6 +111,7 @@ func (v *CachedValue[T]) Get(ctx context.Context, load func(context.Context) (T,
 		v.mu.Lock()
 		if v.version.Load() == verBefore {
 			v.c.Set(v.key, val, v.ttl)
+			v.lastGood.Store(&staleEntry[T]{val: val})
 		}
 		v.mu.Unlock()
 		return val, nil
@@ -119,7 +126,7 @@ func (v *CachedValue[T]) Get(ctx context.Context, load func(context.Context) (T,
 	return typed, nil
 }
 
-// GetStale returns the cached value if present and true; otherwise the zero value of T and false. Does not call load. Nil receiver returns (zero, false).
+// GetStale returns the in-TTL value from the internal cache if present; otherwise the last successfully loaded value (survives TTL eviction); otherwise (zero, false). Does not call load. Nil receiver returns (zero, false).
 func (v *CachedValue[T]) GetStale() (T, bool) {
 	var zero T
 	if v == nil {
@@ -127,6 +134,9 @@ func (v *CachedValue[T]) GetStale() (T, bool) {
 	}
 	if item := v.c.Get(v.key); item != nil {
 		return item.Value(), true
+	}
+	if entry := v.lastGood.Load(); entry != nil {
+		return entry.val, true
 	}
 	return zero, false
 }
@@ -140,6 +150,7 @@ func (v *CachedValue[T]) Invalidate() {
 	v.version.Add(1)
 	v.sf.Forget(v.key)
 	v.c.Delete(v.key)
+	v.lastGood.Store(nil)
 	v.mu.Unlock()
 }
 

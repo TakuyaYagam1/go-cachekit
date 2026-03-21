@@ -35,8 +35,8 @@ import "github.com/takuya-go-kit/go-cachekit"
 
 - **NewCachedValue[T](key, ttl)** — one key, ttlcache + singleflight
 - **Get(ctx, load)** — cached or load(ctx), then cache
-- **GetStale** — return cached value without loading
-- **Invalidate** — delete and forget singleflight
+- **GetStale** — return in-TTL value or the last successfully loaded stale entry without loading
+- **Invalidate** — delete, forget singleflight, and clear the stale entry
 
 ### Redis client
 

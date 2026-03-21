@@ -36,7 +36,7 @@
 // # Single-value TTL cache (CachedValue)
 //
 // CachedValue caches one value by key with TTL and singleflight. Prefer NewCachedValueE (returns error) over NewCachedValue (panics if ttl <= 0) for config-driven or dynamic ttl. When ctx is cancelled the internal goroutine stops. If ctx is context.Background(), the goroutine never exits until Stop is called—call Stop when the value is no longer needed to avoid goroutine leaks.
-// Get calls load with a configurable timeout (default 30s); use WithLoadTimeout(d) (CachedValueOption) when constructing to override. GetStale returns only from cache. Invalidate clears the value and singleflight; an in-flight Get that finishes after Invalidate will not write back.
+// Get calls load with a configurable timeout (default 30s); use WithLoadTimeout(d) (CachedValueOption) when constructing to override. GetStale returns the in-TTL value or the last successfully loaded stale entry without calling load. Invalidate clears the value, stale entry, and singleflight; an in-flight Get that finishes after Invalidate will not write back.
 //
 // # Key-value store
 //
